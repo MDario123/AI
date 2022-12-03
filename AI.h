@@ -12,7 +12,7 @@ mt19937 rng(chrono::steady_clock::now().time_since_epoch().count());
 vector<int> aiInitializer{ 4, 4, 1 };
 const int trueinputsz = 1;
 const int datasz = 1000;
-const int logai = 1;
+const int logai = 10;
 const int aiAmount = (1<<logai);
 const int threads = 256;
 
@@ -33,8 +33,8 @@ __global__ void LayerEval(double* out, double* in, double* factors, double* bias
 __global__ void grand(double* out, int sz, int chance, unsigned int seed, unsigned int seed2) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i < sz) {
-        if ((seed + (i + 1ll)  * seed2) % chance == 0) {
-            out[i] = (double)(int)(seed + (sz + i + 1ll) * seed2) / (1ll << 31);
+        if (((seed + i  * seed2)/(1<<16)) % chance == 0) {
+            out[i] = (double)(int)(seed + (sz + i) * seed2) / (1ll << 31);
         }
     }
 }
@@ -93,6 +93,7 @@ struct AI {
             }
         }
     }
+    //Partially randomizes the weights in the AI, each weight has a chance(chance) of being randomized
     void mutate(const int& chance) {
         for (int i = 0; i < layers; i++) {
             grand << <(dim[i] + threads - 1) / threads, threads >> > (bias[i], dim[i], chance, rng(), rng());
@@ -104,5 +105,27 @@ struct AI {
             }
         }
         cudaDeviceSynchronize();
+    }
+    double* solve(double* data, int size) {
+        double* in = data;
+        for (int i = 0; i < layers; i++) {
+            double* out;
+            gpuErrchk(cudaMalloc((void**)&out, size * dim[i] * sizeof(double)));
+            if (i == 0) {
+                LayerEval << <(size * dim[i] + threads - 1) / threads, threads >> > (out, in, factors[i], bias[i], size, trueinputsz, dim[i], 1);
+            }
+            else {
+                LayerEval << <(size * dim[i] + threads - 1) / threads, threads >> > (out, in, factors[i], bias[i], size, dim[i-1] , dim[i], 1);
+                gpuErrchk(cudaDeviceSynchronize());
+                cudaFree(in);
+            }
+            gpuErrchk(cudaDeviceSynchronize());
+            in = out;
+            out = nullptr;
+        }
+        double* value = new double[size * dim[layers - 1]];
+        gpuErrchk(cudaMemcpy(value, in, size * dim[layers - 1] * sizeof(double), cudaMemcpyDeviceToHost));
+        cudaFree(in);
+        return value;
     }
 };
