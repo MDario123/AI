@@ -51,7 +51,7 @@ struct AI {
         factors = new double* [layers];
         for (int i = 0; i < layers; i++) {
             dim[i] = v[i];
-            gpuErrchk(cudaMalloc((void**)&bias[i], dim[i]*sizeof(double)));
+            gpuErrchk(cudaMalloc((void**)&bias[i], dim[i] * sizeof(double)));
             if (i == 0) {
                 gpuErrchk(cudaMalloc((void**)&factors[i], dim[i] * trueinputsz * sizeof(double)));
             }
@@ -63,17 +63,22 @@ struct AI {
     }
     void add(AI& ai, AI& ai1) {
         for (int i = 0; i < layers; i++) {
-            if (i & 1) {
+            if (rng() & 1) {
                 gpuErrchk(cudaMemcpy(bias[i], ai.bias[i], dim[i] * sizeof(double), cudaMemcpyDeviceToDevice));
             }
             else {
                 gpuErrchk(cudaMemcpy(bias[i], ai1.bias[i], dim[i] * sizeof(double), cudaMemcpyDeviceToDevice));
             }
             if (i == 0) {
-                gpuErrchk(cudaMemcpy(factors[i], ai.factors[i], dim[i] * trueinputsz * sizeof(double), cudaMemcpyDeviceToDevice));
+                if (rng() & 1) {
+                    gpuErrchk(cudaMemcpy(factors[i], ai.factors[i], dim[i] * trueinputsz * sizeof(double), cudaMemcpyDeviceToDevice));
+                }
+                else {
+                    gpuErrchk(cudaMemcpy(factors[i], ai1.factors[i], dim[i] * trueinputsz * sizeof(double), cudaMemcpyDeviceToDevice));
+                }
             }
             else {
-                if (i & 1) {
+                if (rng() & 1) {
                     gpuErrchk(cudaMemcpy(factors[i], ai.factors[i], dim[i] * dim[i - 1] * sizeof(double), cudaMemcpyDeviceToDevice));
                 }
                 else {
