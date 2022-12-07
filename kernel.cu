@@ -1,6 +1,12 @@
 ﻿#include "AI.h"
 #define F first
 #define S second
+
+vector<int> aiInitializer{ 1, 4, 4, 1 };
+const int datasz = 1000;
+const int topai = 10;
+const int aiAmount = 1024;
+
 int main()
 {
     AI current[aiAmount];
@@ -37,8 +43,8 @@ int main()
             topscore = tosort[0].F;
         }
         cout << tosort[0].F << "\n";
-        for (int i = logai; i < aiAmount; i++) {
-            int x = rng() % logai, y = rng() % logai;
+        for (int i = topai; i < aiAmount; i++) {
+            int x = rng() % topai, y = rng() % topai;
             current[tosort[i].S].add(current[tosort[x].S], current[tosort[y].S]);
         }
         for (int i = 0; i < aiAmount; i++) {

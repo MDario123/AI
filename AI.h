@@ -9,13 +9,6 @@ using namespace std;
 #define ran (long double)(int)rng() / (1ll << 31)
 mt19937 rng(chrono::steady_clock::now().time_since_epoch().count());
 
-vector<int> aiInitializer{ 4, 4, 1 };
-const int trueinputsz = 1;
-const int datasz = 1000;
-const int logai = 10;
-const int aiAmount = (1<<logai);
-const int threads = 256;
-
 __global__ void LayerEval(double* out, double* in, double* factors, double* bias, int sz, int insz, int outsz, bool b) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i < sz * outsz) {
@@ -49,81 +42,48 @@ struct AI {
         dim = new int[layers];
         bias = new double* [layers];
         factors = new double* [layers];
-        for (int i = 0; i < layers; i++) {
+        dim[0] = v[0];
+        for (int i = 1; i < layers; i++) {
             dim[i] = v[i];
             gpuErrchk(cudaMalloc((void**)&bias[i], dim[i] * sizeof(double)));
-            if (i == 0) {
-                gpuErrchk(cudaMalloc((void**)&factors[i], dim[i] * trueinputsz * sizeof(double)));
-            }
-            else {
-                gpuErrchk(cudaMalloc((void**)&factors[i], dim[i] * dim[i - 1] * sizeof(double)));
-            }
+            gpuErrchk(cudaMalloc((void**)&factors[i], dim[i] * dim[i - 1] * sizeof(double)));
         }
         mutate(1);
     }
     void add(AI& ai, AI& ai1) {
-        for (int i = 0; i < layers; i++) {
+        for (int i = 1; i < layers; i++) {
             if (rng() & 1) {
                 gpuErrchk(cudaMemcpy(bias[i], ai.bias[i], dim[i] * sizeof(double), cudaMemcpyDeviceToDevice));
+                gpuErrchk(cudaMemcpy(factors[i], ai.factors[i], dim[i] * dim[i - 1] * sizeof(double), cudaMemcpyDeviceToDevice));
             }
             else {
                 gpuErrchk(cudaMemcpy(bias[i], ai1.bias[i], dim[i] * sizeof(double), cudaMemcpyDeviceToDevice));
-            }
-            if (i == 0) {
-                if (rng() & 1) {
-                    gpuErrchk(cudaMemcpy(factors[i], ai.factors[i], dim[i] * trueinputsz * sizeof(double), cudaMemcpyDeviceToDevice));
-                }
-                else {
-                    gpuErrchk(cudaMemcpy(factors[i], ai1.factors[i], dim[i] * trueinputsz * sizeof(double), cudaMemcpyDeviceToDevice));
-                }
-            }
-            else {
-                if (rng() & 1) {
-                    gpuErrchk(cudaMemcpy(factors[i], ai.factors[i], dim[i] * dim[i - 1] * sizeof(double), cudaMemcpyDeviceToDevice));
-                }
-                else {
-                    gpuErrchk(cudaMemcpy(factors[i], ai1.factors[i], dim[i] * dim[i - 1] * sizeof(double), cudaMemcpyDeviceToDevice));
-                }
+                gpuErrchk(cudaMemcpy(factors[i], ai1.factors[i], dim[i] * dim[i - 1] * sizeof(double), cudaMemcpyDeviceToDevice));
             }
         }
     }
     void copy(AI& ai) {
-        for (int i = 0; i < layers; i++) {
+        for (int i = 1; i < layers; i++) {
             gpuErrchk(cudaMemcpy(bias[i], ai.bias[i], dim[i] * sizeof(double), cudaMemcpyDeviceToDevice));
-            if (i == 0) {
-                gpuErrchk(cudaMemcpy(factors[i], ai.factors[i], dim[i] * trueinputsz * sizeof(double), cudaMemcpyDeviceToDevice));
-            }
-            else {
-                gpuErrchk(cudaMemcpy(factors[i], ai.factors[i], dim[i] * dim[i - 1] * sizeof(double), cudaMemcpyDeviceToDevice));
-            }
+            gpuErrchk(cudaMemcpy(factors[i], ai.factors[i], dim[i] * dim[i - 1] * sizeof(double), cudaMemcpyDeviceToDevice));
         }
     }
     //Partially randomizes the weights in the AI, each weight has a chance(chance) of being randomized
     void mutate(const int& chance) {
-        for (int i = 0; i < layers; i++) {
+        for (int i = 1; i < layers; i++) {
             grand << <(dim[i] + threads - 1) / threads, threads >> > (bias[i], dim[i], chance, rng(), rng());
-            if (i == 0) {
-                grand << <(dim[i] * trueinputsz + threads - 1) / threads, threads >> > (factors[i], dim[i] * trueinputsz, chance, rng(), rng());
-            }
-            else {
-                grand << <(dim[i] * dim[i - 1] + threads - 1) / threads, threads >> > (factors[i], dim[i] * dim[i - 1], chance, rng(), rng());
-            }
+            grand << <(dim[i] * dim[i - 1] + threads - 1) / threads, threads >> > (factors[i], dim[i] * dim[i - 1], chance, rng(), rng());
         }
         cudaDeviceSynchronize();
     }
     double* solve(double* data, int size) {
         double* in = data;
-        for (int i = 0; i < layers; i++) {
+        for (int i = 1; i < layers; i++) {
             double* out;
             gpuErrchk(cudaMalloc((void**)&out, size * dim[i] * sizeof(double)));
-            if (i == 0) {
-                LayerEval << <(size * dim[i] + threads - 1) / threads, threads >> > (out, in, factors[i], bias[i], size, trueinputsz, dim[i], 1);
-            }
-            else {
-                LayerEval << <(size * dim[i] + threads - 1) / threads, threads >> > (out, in, factors[i], bias[i], size, dim[i-1] , dim[i], 1);
-                gpuErrchk(cudaDeviceSynchronize());
-                cudaFree(in);
-            }
+            LayerEval << <(size * dim[i] + threads - 1) / threads, threads >> > (out, in, factors[i], bias[i], size, dim[i-1] , dim[i], 1);
+            gpuErrchk(cudaDeviceSynchronize());
+            if(i>1)cudaFree(in);
             gpuErrchk(cudaDeviceSynchronize());
             in = out;
             out = nullptr;
