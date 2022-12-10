@@ -3,11 +3,6 @@ using namespace std;
 #include "Parallel_Basic.h"
 #include <iostream>
 #include<vector>
-#include<random>
-#include<chrono>
-
-#define ran (long double)(int)rng() / (1ll << 31)
-mt19937 rng(chrono::steady_clock::now().time_since_epoch().count());
 
 __global__ void LayerEval(double* out, double* in, double* factors, double* bias, int sz, int insz, int outsz, bool b) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
@@ -23,14 +18,7 @@ __global__ void LayerEval(double* out, double* in, double* factors, double* bias
         else out[i] = tem;
     }
 }
-__global__ void grand(double* out, int sz, int chance, unsigned int seed, unsigned int seed2) {
-    int i = blockIdx.x * blockDim.x + threadIdx.x;
-    if (i < sz) {
-        if (((seed + i  * seed2)/(1<<16)) % chance == 0) {
-            out[i] = (double)(int)(seed + (sz + i) * seed2) / (1ll << 31);
-        }
-    }
-}
+
 struct AI {
     int layers;
     int* dim;
@@ -76,21 +64,36 @@ struct AI {
         }
         cudaDeviceSynchronize();
     }
-    double* solve(double* data, int size) {
+    double solve(double* data, double* answer, int size) {
+
         double* in = data;
+
         for (int i = 1; i < layers; i++) {
             double* out;
             gpuErrchk(cudaMalloc((void**)&out, size * dim[i] * sizeof(double)));
             LayerEval << <(size * dim[i] + threads - 1) / threads, threads >> > (out, in, factors[i], bias[i], size, dim[i-1] , dim[i], 1);
             gpuErrchk(cudaDeviceSynchronize());
             if(i>1)cudaFree(in);
-            gpuErrchk(cudaDeviceSynchronize());
             in = out;
             out = nullptr;
         }
-        double* value = new double[size * dim[layers - 1]];
-        gpuErrchk(cudaMemcpy(value, in, size * dim[layers - 1] * sizeof(double), cudaMemcpyDeviceToHost));
+
+        VectorVectorPointAddition << <(size + threads - 1) / threads, threads >> > (in, answer, size * dim[layers - 1]);
+        VectorVectorPointMultiplication << <(size + threads - 1) / threads, threads >> > (in, in, size * dim[layers - 1]);
+        double ans = VectorAddition(in, size * dim[layers - 1]);
+
         cudaFree(in);
-        return value;
+
+        return ans;
+    }
+    void destroy() {
+        for (int i = 1; i < layers; i++) {
+            cudaFree(factors[i]);
+            cudaFree(bias[i]);
+        }
+        cudaFree(factors);
+        cudaFree(bias);
+        free(dim);
+        cudaFree(this);
     }
 };

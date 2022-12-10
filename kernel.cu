@@ -1,6 +1,4 @@
-﻿#include "AI.h"
-#define F first
-#define S second
+﻿#include "Training.h"
 
 vector<int> aiInitializer{ 1, 4, 4, 1 };
 const int datasz = 1000;
@@ -9,49 +7,19 @@ const int aiAmount = 1024;
 
 int main()
 {
-    AI current[aiAmount];
-    for (int i = 0; i < aiAmount; i++) {
-        current[i] = AI(aiInitializer);
-    }
-    
-    double topscore = INFINITY;
-    AI topAI = AI(aiInitializer);
-
     double* data;
     cudaMallocManaged((void**)&data, datasz * sizeof(double));
     for (int i = 0; i < datasz; i++)data[i] = i;
 
-    double* answer = new double[datasz * aiInitializer.back()];
-    for (int i = 0; i < datasz * aiInitializer.back(); i++)answer[i] = i;
+    double* answer;
+    cudaMallocManaged((void**)&answer, datasz * sizeof(double));
+    for (int i = 0; i < datasz * aiInitializer.back(); i++)answer[i] = -i;
 
-    for (int epoch = 1; epoch <= 1000; epoch++) {
-        cout << "Epoch: " << epoch << "\n";
-        pair<double, int> tosort[aiAmount];
-        for (int i = 0; i < aiAmount; i++) {
-            tosort[i].S = i;
-            tosort[i].F = 0;
-            double* out = current[i].solve(data, datasz);
-            for (int t = 0; t < datasz * aiInitializer.back(); t++) {
-                tosort[i].F += (out[t] - answer[t]) * (out[t] - answer[t]);
-            }
+    GeneticTraining(aiAmount, topai, data, datasz, answer, aiInitializer, 10);
 
-            free(out);
-        }
-        sort(tosort, tosort + aiAmount);
-        if (tosort[0].F < topscore) {
-            topAI.copy(current[tosort[0].S]);
-            topscore = tosort[0].F;
-        }
-        cout << tosort[0].F << "\n";
-        for (int i = topai; i < aiAmount; i++) {
-            int x = rng() % topai, y = rng() % topai;
-            current[tosort[i].S].add(current[tosort[x].S], current[tosort[y].S]);
-        }
-        for (int i = 0; i < aiAmount; i++) {
-            current[i].mutate(10);
-        }
-    }
-
+    cudaFree(data);
+    cudaFree(answer);
+    _sleep(5000);
     cudaDeviceReset();
     return 0;
 }
