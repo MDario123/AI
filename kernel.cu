@@ -15,7 +15,7 @@ int main()
     cudaMallocManaged((void**)&answer, datasz * sizeof(double));
     for (int i = 0; i < datasz * aiInitializer.back(); i++)answer[i] = -i;
 
-    GeneticTraining(aiAmount, topai, data, datasz, answer, aiInitializer, 10);
+    GeneticTraining(aiAmount, topai, data, datasz, answer, aiInitializer, 100);
 
     cudaFree(data);
     cudaFree(answer);

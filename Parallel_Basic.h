@@ -47,18 +47,22 @@ __global__ void VectorVectorPointMultiplication(double* vectorx, double* vectory
         vectorx[i] *= vectory[i];
     }
 }
-
-double VectorAddition(double* vector, int size) {
-    
-    double* vectort = new double[size];
-    gpuErrchk(cudaMemcpy(vectort, vector, size*sizeof(double), cudaMemcpyDeviceToHost));
-    double ans = 0;
-    
-    for (int i = 0; i < size; i++) {
-        ans += vectort[i];
+__global__ void VectorElementSum(double* vector, int size, int stride) {
+    int i = 2*(blockIdx.x * blockDim.x + threadIdx.x);
+    for (int t = 1; t < 64; t = (t << 1) + 1) {
+        if ((i & t) == 0 && (i + t)*stride < size)vector[i*stride] += vector[(i + t)*stride];
     }
+}
+double VectorAddition(double* vector, int size) {
+    double ans;
     
-    free(vectort);
+    for (int i = 1; i < size; i*=64) {
+        VectorElementSum << <((size/(2*i))+threads-1)/threads, threads >> > (vector, size, i);
+        cudaDeviceSynchronize();
+    }
+
+    cudaMemcpy(&ans, vector, sizeof(double), cudaMemcpyDeviceToHost);
+    
     cudaFree(vector);
     
     return ans;
