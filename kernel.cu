@@ -4,9 +4,11 @@ vector<int> aiInitializer{ 1, 4, 4, 1 };
 const int datasz = 1000;
 const int topai = 10;
 const int aiAmount = 1024;
-
+#include <string.h>
 int main()
 {
+    freopen("trainingData.txt", "r", stdin);
+    /*
     double* data;
     cudaMallocManaged((void**)&data, datasz * sizeof(double));
     for (int i = 0; i < datasz; i++)data[i] = i;
@@ -20,6 +22,7 @@ int main()
     cudaFree(data);
     cudaFree(answer);
     _sleep(5000);
+    */
     cudaDeviceReset();
     return 0;
 }

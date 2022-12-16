@@ -83,6 +83,9 @@
     <ClInclude Include="AI.h" />
     <ClInclude Include="Training.h" />
   </ItemGroup>
+  <ItemGroup>
+    <Text Include="..\..\Codiguitos_OwO\trainingData.txt" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
     <Import Project="$(VCTargetsPath)\BuildCustomizations\CUDA 11.8.targets" />
