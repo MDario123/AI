@@ -53,6 +53,13 @@ __global__ void VectorElementSum(double* vector, int size, int stride) {
         if ((i & t) == 0 && (i + t)*stride < size)vector[i*stride] += vector[(i + t)*stride];
     }
 }
+__global__ void Normalize(double* vector, int size) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i < size) {
+        if (vector[i] <= 0)vector[i] = 0;
+        else vector[i] = 1;
+    }
+}
 double VectorAddition(double* vector, int size) {
     double ans;
     

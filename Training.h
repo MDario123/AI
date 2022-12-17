@@ -20,6 +20,7 @@ AI GeneticTraining(const int aiAmount, int topai, double* data, int datasz, doub
             tosort[i].F = current[i].solve(data, answer, datasz);
         }
         sort(tosort, tosort + aiAmount);
+        reverse(tosort, tosort + aiAmount);
         //Storing the best
         if (tosort[0].F < topscore) {
             topAI.copy(current[tosort[0].S]);

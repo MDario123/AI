@@ -71,17 +71,16 @@ struct AI {
         for (int i = 1; i < layers; i++) {
             double* out;
             gpuErrchk(cudaMalloc((void**)&out, size * dim[i] * sizeof(double)));
-            LayerEval << <(size * dim[i] + threads - 1) / threads, threads >> > (out, in, factors[i], bias[i], size, dim[i-1] , dim[i], 1);
+            LayerEval << <(size * dim[i] + threads - 1) / threads, threads >> > (out, in, factors[i], bias[i], size, dim[i-1] , dim[i], (i+1<layers));
             gpuErrchk(cudaDeviceSynchronize());
             if(i>1)cudaFree(in);
             in = out;
             out = nullptr;
         }
-
-        VectorVectorPointAddition << <(size + threads - 1) / threads, threads >> > (in, answer, size * dim[layers - 1]);
-        VectorVectorPointMultiplication << <(size + threads - 1) / threads, threads >> > (in, in, size * dim[layers - 1]);
+        
+        Normalize << <(size + threads - 1) / threads, threads >> > (in, size * dim[layers - 1]);
+        VectorVectorPointMultiplication << <(size + threads - 1) / threads, threads >> > (in, answer, size * dim[layers - 1]);
         double ans = VectorAddition(in, size * dim[layers - 1]);
-
         cudaFree(in);
 
         return ans;
